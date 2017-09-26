@@ -8,6 +8,8 @@ namespace STBootLib
 {
     public class STBoot : IDisposable
     {
+        /* Bootloader entry interface */
+        ISTBootEntry bootEntry = null;
         /* serial port */
         SerialPort sp;
         /* command mutex */
@@ -40,17 +42,40 @@ namespace STBootLib
         /* dispose implementation */
         public void Dispose()
         {
+            if (bootEntry != null && sp != null)
+            {
+                bootEntry.AssertBootloaderEntry(sp, false);
+            }
             /* close serial port */
             Close();
         }
 
         /* open serial port */
-        public void Open(string portName, uint baudRate)
+        public void Open(string portName, uint baudRate, ISTBootEntry bootloaderEntry = null)
         {
+            /* Take our bootloader entry interface. */
+            bootEntry = bootloaderEntry;
+
             /* initialize serial port */
             sp = new SerialPort(portName, (int)baudRate, Parity.Even, 8);
             /* open serial port */
             sp.Open();
+
+            if (bootEntry != null)
+            {
+                // Assert reset
+                bootEntry.AssertReset(sp, true);
+
+                // Assert enter ISP (boot0)
+                bootEntry.AssertBootloaderEntry(sp, true);
+
+                // Delay
+                bootEntry.ResetWait();
+
+                // De-assert reset
+                bootEntry.AssertReset(sp, false);
+            }
+
 
             /* discard buffers */
             sp.DiscardInBuffer();
